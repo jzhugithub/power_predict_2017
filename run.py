@@ -30,7 +30,6 @@ class User(object):
     def predict(self, array_begin, array_end):
         power_predict = []
         for i, value in enumerate(range(array_begin, array_end)):
-            # power_predict.append(self.average_power)
             power_predict.append(self.average_power + self.delta_power_in_week[value % 7])
         return power_predict
 
@@ -108,6 +107,16 @@ def preprocessing(user):
     return user
 
 
+def merge_user(user):
+    user_total = User('-1')
+    user_total.date = user[0].date
+    power_total = np.zeros(len(user[0].power))
+    for i in range(len(user)):
+        power_total = power_total + np.array(user[i].power)
+    user_total.power = power_total.tolist()
+    return user_total
+
+
 def show_figure(show_index, user, sum=False):
     if sum:
         user_power_total = np.zeros(len(user[0].power))
@@ -121,13 +130,15 @@ def show_figure(show_index, user, sum=False):
             plt.plot(range(len(user[temp_show_index].date)), user[temp_show_index].power, 'r')
             plt.show()
 
+
 def show_result(user, power_2016_9_total):
     user_power_total = np.zeros(len(user[0].power))
     for temp_show_index in range(len(user)):
         user_power_total = user_power_total + np.array(user[temp_show_index].power)
     plt.plot(range(len(user[0].date)), user_power_total, 'b')
-    plt.plot(range(len(user[0].power),len(user[0].power) + 30), power_2016_9_total, 'r')
+    plt.plot(range(len(user[0].power), len(user[0].power) + 30), power_2016_9_total, 'r')
     plt.show()
+
 
 def write_csv(csv_name, predict_power):
     print('--export date')
@@ -143,25 +154,38 @@ if __name__ == '__main__':
     user, user_id = import_date('Tianchi_power.csv')
     print('user number: ' + str(len(user)))
     print('date length: ' + str(len(user[0].date)))
+
     # preprocessing
     user = preprocessing(user)
+    user_total = merge_user(user)
+
     # show average power
     # show_figure(range(0,len(user)), user, sum = True)
-    # train and predict
-    average_error_vaild_total = 0
-    power_2016_9_total = np.zeros(30)
-    for i in range(len(user)):
-        # train for vaild
-        user[i].train(0, 578)
-        user[i].vaild(578, 609)
-        average_error_vaild_total = average_error_vaild_total + user[i].average_error_vaild
-        # train for predict
-        user[i].train(0, 609)
-        power_2016_9_total = power_2016_9_total + np.array(user[i].predict(609, 639))
+
+    # train and predict in total
+    user_total.train(0, 578)  # train for vaild
+    user_total.vaild(578, 609)
+    average_error_vaild_total = user_total.average_error_vaild
+    user_total.train(0, 609)  # train for predict
+    power_2016_9_total = user_total.predict(609, 639)
+
+    # train and predict in  separateness
+    # average_error_vaild_total = 0
+    # power_2016_9_total = np.zeros(30)
+    # for i in range(len(user)):
+    #     # train for vaild
+    #     user[i].train(0, 578)
+    #     user[i].vaild(578, 609)
+    #     average_error_vaild_total = average_error_vaild_total + user[i].average_error_vaild
+    #     # train for predict
+    #     user[i].train(0, 609)
+    #     power_2016_9_total = power_2016_9_total + np.array(user[i].predict(609, 639))
     print('average_error_vaild: ' + str(average_error_vaild_total))
     print('power_2016_9_total:')
     print(power_2016_9_total)
+
     # show predict result
     show_result(user, power_2016_9_total)
+
     # export
     write_csv('Tianchi_power_predict_table.csv', power_2016_9_total)
