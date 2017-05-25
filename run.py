@@ -7,11 +7,47 @@ def avg(list):
     return sum(list) / len(list)
 
 
+class Holiday(object):
+    name_with_delta = {}
+    index_with_name = {}
+
+    def __init__(self):
+        pass
+
+    def add_name_with_delta(self, name, delta):
+        self.name_with_delta[name] = delta
+
+    def add_index_with_name(self, index, name):
+        self.index_with_name[index] = name
+
+    def has_index(self, index):
+        return index in self.index_with_name
+
+    def has_name(self, name):
+        return name in self.name_with_delta
+
+    def get_name_by_index(self, index):
+        if self.has_index(index):
+            return self.index_with_name[index]
+        else:
+            print('index is not exist')
+
+    def get_delta_by_name(self, name):
+        if self.has_name(name):
+            return self.name_with_delta[name]
+        else:
+            print('name is not exist')
+
+    def get_delta_by_index(self, index):
+        return self.get_delta_by_name(self.get_name_by_index(index))
+
+
 class User(object):
     # information
     id = 'id'
     date = []
     power = []
+    holiday = Holiday()
     # model
     pre_average_length_best = 90
     delta_in_week_length_best = 0
@@ -25,13 +61,31 @@ class User(object):
         self.date.append(a_date)
         self.power.append(int(a_power))
 
+    def set_holiday(self):
+        self.holiday.add_index_with_name(269, 'zqj')# zhongqiujie
+        self.holiday.add_index_with_name(623, 'zqj')
+        self.holiday.add_index_with_name(272, 'gq-1')# guoqing -1
+        self.holiday.add_index_with_name(638, 'gq-1')
+        self.holiday.add_index_with_name(248, 'bj')# Sunday, but have to work
+        self.holiday.add_index_with_name(626, 'bj')
+
+        self.compute_holiday_delta(269, 'zqj')
+        self.compute_holiday_delta(272, 'gq-1')
+        self.compute_holiday_delta(248, 'bj')
+
+    def compute_holiday_delta(self, index, name):
+        pre_average = self.get_average_power(index - self.pre_average_length_best, index)
+        delta = self.power[int(index)] - pre_average
+        self.holiday.add_name_with_delta(name, delta)
+
     def train(self, arrays):
+        self.set_holiday()
         pre_average_length_min = range(len(arrays))
         delta_in_week_length = range(len(arrays))
         for i in range(len(arrays)):
             model_error_min = 1000000000
-            for pal in range(10, 100, 10):
-                for diwl in range(10, 150, 10):
+            for pal in range(30, 100, 10):
+                for diwl in range(50, 150, 10):
                     model_error_temp = self.model_error(arrays[i], [pal, diwl])
                     if model_error_temp < model_error_min:
                         model_error_min = model_error_temp
@@ -59,6 +113,12 @@ class User(object):
         power_predict = []
         for i, value in enumerate(range(array_begin, array_end)):
             power_predict.append(average + delta_in_week[value % 7])
+        # deal with holiday
+        for index in self.holiday.index_with_name:
+            if index>array_begin and index < array_end:
+                power_predict[index - array_begin] = average + self.holiday.get_delta_by_index(index)
+                # [index - array_begin] is a important, don no forget to minus array_begin
+
         return power_predict
 
     def evaluate(self, arrays):
@@ -68,6 +128,8 @@ class User(object):
         return avg(errors)
 
     def predict(self, array_begin, array_end):
+        print('pre_average_length_best: ' + str(self.pre_average_length_best))
+        print('delta_in_week_length_best: ' + str(self.delta_in_week_length_best))
         return self.model(array_begin, array_end, [self.pre_average_length_best, self.delta_in_week_length_best])
 
     def get_average_power(self, array_begin, array_end):
@@ -156,18 +218,22 @@ def show_figure(show_index, user, sum_flag=False):
         user_power_total = np.zeros(len(user[0].power))
         for temp_show_index in show_index:
             user_power_total = user_power_total + np.array(user[temp_show_index].power)
-        plt.plot(range(len(user[0].date)), user_power_total, 'r')
+        plt.plot(range(len(user[0].date)), user_power_total, 'k')
+        plt.plot(range(len(user[0].date))[3:len(user[0].date):7], user_power_total[3:len(user[0].date):7], '*r')
         plt.show()
     else:
         for temp_show_index in show_index:
-            plt.figure(temp_show_index)
-            plt.plot(range(len(user[temp_show_index].date)), user[temp_show_index].power, 'r')
+            plt.plot(range(len(user[temp_show_index].date)), user[temp_show_index].power, 'k')
+            plt.plot(range(len(user[temp_show_index].date))[3:len(user[temp_show_index].date):7],
+                     user[temp_show_index].power[3:len(user[temp_show_index].date):7], '*r')
+
             plt.show()
 
 
 def show_result(user_total):
-    plt.plot(range(len(user_total.date) - 30), user_total.power[:-30], 'b')
-    plt.plot(range(len(user_total.date) - 30, len(user_total.date)), user_total.power[-30:], 'r')
+    plt.plot(range(len(user_total.date) - 30), user_total.power[:-30], 'k')
+    plt.plot(range(len(user_total.date) - 30, len(user_total.date)), user_total.power[-30:], 'b')
+    plt.plot(range(len(user_total.date))[3:len(user_total.date):7], user_total.power[3:len(user[0].date):7], '*r')
     plt.show()
 
 
@@ -191,10 +257,10 @@ if __name__ == '__main__':
     user_total = merge_user(user)
 
     # show average power
-    # show_figure(range(0,len(user)), user, sum = True)
+    # show_figure(range(0,len(user)), user, sum_flag = False)
 
     # train
-    train_arrays = [[519, 549], [549, 579], [579, 609]]
+    train_arrays = [[549, 579], [579, 609]]
     user_total.train(train_arrays)
     error_train = user_total.evaluate(train_arrays)
     print('error_train: ' + str(error_train))
@@ -206,11 +272,16 @@ if __name__ == '__main__':
 
     # predict
     power_2016_9_total = user_total.predict(609, 639)
+    # power_2016_9_total = user_total.predict(579, 609)
     user_total.power[-30:] = power_2016_9_total
     print('power_2016_9_total: ' + str(power_2016_9_total))
 
     # show predict result
     show_result(user_total)
+    # plt.plot(range(len(user_total.date) - 30), user_total.power[:-30], 'k')
+    # plt.plot(range(579, 609), power_2016_9_total, 'b')
+    # plt.plot(range(len(user_total.date))[3:len(user_total.date):7], user_total.power[3:len(user[0].date):7], '*r')
+    # plt.show()
 
     # export
     write_csv('Tianchi_power_predict_table.csv', power_2016_9_total)
