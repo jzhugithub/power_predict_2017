@@ -1,5 +1,5 @@
 Tianchi_power.7z
 Tianchi_power.csv
-Tianchi_power_predict_table.csv
+Tianchi_power_predict*.csv
 .idea/
 test.py
