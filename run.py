@@ -3,24 +3,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def avg(list):
-    return sum(list) / len(list)
+def avg(nparray):
+    return sum(nparray) / len(nparray)
 
 
-def max(list, num):
-    return [i if i > 0 else 0 for i in list]
+def max(nparray, num):
+    return np.array([i if i > num else num for i in nparray])
 
 
 def filter_smooth(nparray):
-    filter1 = nparray
+    filter1 = np.array(nparray)
     # filter1[-30:] = np.ones(30)*np.median(nparray[len(nparray)-60:len(nparray)-32:2])
-    for i in range(7, len(nparray)-8):
-        filter1[i] = np.median(nparray[i-7:i+7])
-    filter2 = filter1
-    for i in range(15, len(filter1)-16):
-        filter2[i] = np.mean(filter1[i-15:i+15:2])
-    filter2[-45:] = filter2[-45-365:-365]+filter2[-45]-filter2[-45-365]
-    filter2[-45:] = max(filter2[-45:],0)
+    for i in range(7, len(nparray) - 8):
+        filter1[i] = np.median(nparray[i - 7:i + 7])
+    filter2 = np.array(filter1)
+    for i in range(7, len(filter1) - 8):
+        filter2[i] = np.mean(filter1[i - 7:i + 7])
+    filter2[-45:] = filter2[-45 - 365:-365] + filter2[-45] - filter2[-45 - 365]
+    filter2[-45:] = max(filter2[-45:], 0)
     return filter2
 
 
@@ -63,29 +63,28 @@ class User(object):
     # information
     id = 'id'
     date = []
-    power = []
+    power = np.array([])
     power_filter = np.array([])
     power_minus_filter = np.array([])
     holiday = Holiday()
     # model
-    pre_average_length_best = 90
     delta_in_week_length_best = 0
 
-    def __init__(self, userid):
+    def __init__(self, userid, a_date, a_power):
         self.id = userid
-        self.date = []
-        self.power = []
+        self.date = a_date
+        self.power = a_power
 
     def append(self, a_date, a_power):
         self.date.append(a_date)
-        self.power.append(int(a_power))
+        self.power = np.concatenate((self.power, np.array([a_power])))
 
     def set_holiday(self):
-        self.holiday.add_index_with_name(269, 'zqj')# zhongqiujie
+        self.holiday.add_index_with_name(269, 'zqj')  # zhongqiujie
         self.holiday.add_index_with_name(623, 'zqj')
-        self.holiday.add_index_with_name(272, 'gq-1')# guoqing -1
+        self.holiday.add_index_with_name(272, 'gq-1')  # guoqing -1
         self.holiday.add_index_with_name(638, 'gq-1')
-        self.holiday.add_index_with_name(248, 'bj')# Sunday, but have to work
+        self.holiday.add_index_with_name(248, 'bj')  # Sunday, but have to work
         self.holiday.add_index_with_name(626, 'bj')
 
         self.compute_holiday_delta(269, 'zqj')
@@ -93,104 +92,87 @@ class User(object):
         self.compute_holiday_delta(248, 'bj')
 
     def compute_holiday_delta(self, index, name):
-        pre_average = self.get_average_power(index - self.pre_average_length_best, index)
-        delta = self.power[int(index)] - pre_average
-        self.holiday.add_name_with_delta(name, delta)
+        self.holiday.add_name_with_delta(name, self.power_minus_filter[int(index)])
 
     def train(self, arrays):
         self.set_holiday()
-        pre_average_length_min = range(len(arrays))
         delta_in_week_length_min = range(len(arrays))
         for i in range(len(arrays)):
             model_error_min = 1000000000
-            for pal in range(30, 100, 10):
-                for diwl in range(50, 150, 10):
-                    model_error_temp = self.model_error(arrays[i], [pal, diwl])
-                    if model_error_temp < model_error_min:
-                        model_error_min = model_error_temp
-                        pre_average_length_min[i] = pal
-                        delta_in_week_length_min[i] = diwl
-        self.pre_average_length_best = avg(pre_average_length_min)
+            for diwl in range(50, 150, 10):
+                model_error_temp = self.model_error(arrays[i], [diwl])
+                if model_error_temp < model_error_min:
+                    model_error_min = model_error_temp
+                    delta_in_week_length_min[i] = diwl
         self.delta_in_week_length_best = avg(delta_in_week_length_min)
 
     def model_error(self, array, parameter):
         power_predict = self.model(array[0], array[1], parameter)
-        error = np.array(self.power[array[0]:array[1]]) - np.array(power_predict)
+        error = self.power[array[0]:array[1]] - power_predict
         return avg(abs(error))
 
     def model(self, array_begin, array_end, parameter):
-        # pre_average_length = parameter[0]
-        delta_in_week_length = parameter[1]
-        # average: parameter: pre_average_length
-        # pre_average_last = self.get_average_power(array_begin - 365 - pre_average_length, array_begin - 365)
-        # pre_average = self.get_average_power(array_begin - pre_average_length, array_begin)
-        # pre_average_delta = pre_average - pre_average_last
-        # average = self.get_average_power(array_begin - 365, array_end) + pre_average_delta
-        # average = self.get_average_power(array_begin - pre_average_length, array_begin) + pre_average_delta
-        # average_pre = self.get_average_power(array_begin - pre_average_length, array_begin) + pre_average_delta
-        # average_last = self.get_average_power(array_begin, array_end)
-        # average = 0.5*average_pre + 0.5*average_last
+        delta_in_week_length = parameter[0]
         # delta_in_week: parameter: delta_in_week_length
         delta_in_week = self.get_delta_in_week(array_begin - delta_in_week_length, array_begin)
         # generate power_predict
-        power_predict = []
-        for i, value in enumerate(range(array_begin, array_end)):
-            power_predict.append(self.power_filter[value] + delta_in_week[value % 7])
+        power_predict = np.zeros(array_end - array_begin)
+        for index in range(array_begin, array_end):
+            power_predict[index - array_begin] = self.power_filter[index] + delta_in_week[(array_begin % 7 + index) % 7]
         # deal with holiday
         for index in self.holiday.index_with_name:
-            if index>array_begin and index < array_end:
-                power_predict[index - array_begin] = self.power_filter[index - array_begin] + self.holiday.get_delta_by_index(index)
-                # [index - array_begin] is a important, don no forget to minus array_begin
+            if index > array_begin and index < array_end:
+                power_predict[index - array_begin] = self.power_filter[index] + self.holiday.get_delta_by_index(index)
 
         return max(power_predict, 0)
 
     def evaluate(self, arrays):
         errors = range(len(arrays))
         for i in range(len(arrays)):
-            errors[i] = self.model_error(arrays[i], [self.pre_average_length_best, self.delta_in_week_length_best])
+            errors[i] = self.model_error(arrays[i], [self.delta_in_week_length_best])
         return avg(errors)
 
     def predict(self, array_begin, array_end):
-        print('pre_average_length_best: ' + str(self.pre_average_length_best))
         print('delta_in_week_length_best: ' + str(self.delta_in_week_length_best))
-        return self.model(array_begin, array_end, [self.pre_average_length_best, self.delta_in_week_length_best])
-
-    def get_average_power(self, array_begin, array_end):
-        return sum(self.power[array_begin:array_end]) / float(array_end - array_begin)
+        return self.model(array_begin, array_end, [self.delta_in_week_length_best])
 
     def get_delta_in_week(self, array_begin, array_end):
-        # power_no_average = np.array(self.power[array_begin:array_end]) - self.power_minus_filter[array_begin:array_end]
-        # power_no_average = np.array(self.power[array_begin:array_end]) - self.get_average_power(array_begin, array_end)
         power_in_week = np.zeros(7)
         delta_power_in_week = np.zeros(7)
         date_count = np.zeros(7)
         for index in range(array_begin, array_end):
-            power_in_week[index % 7] = power_in_week[index % 7] + self.power_minus_filter[index - array_begin]
+            power_in_week[index % 7] = power_in_week[index % 7] + self.power_minus_filter[index]
             date_count[index % 7] = date_count[index % 7] + 1
         for index in range(7):
             delta_power_in_week[index] = power_in_week[index] / float(date_count[index])
         return delta_power_in_week
 
 
-def import_date(csv_name):
+def import_date(csv_name, number):
     print('--import date')
     user = []
     user_id = []
     with open(csv_name, 'rb') as f:
         reader = csv.reader(f)
-        temp_user = User('0')
+        temp_date = []
+        temp_power_list = []
         for row in reader:  # row:['record_date', 'user_id', 'power_consumption']
+            if row[1] != 'user_id' and int(row[1])>number:
+                break
             # delete first line
             if row[1] == 'user_id':
+                user_id.append('1')
                 continue
             # create list
-            if (user_id == []) or (row[1] != user_id[-1]):
-                user_id.append(row[1])
-                temp_user = User(row[1])
-                temp_user.append(row[0], row[2])
-                user.append(temp_user)
+            if row[1] != user_id[-1]:
+                user_id.append(row[1])  # this user id
+                user.append(User(user_id[-2], temp_date, np.array(temp_power_list)))  # last user
+                temp_date = [row[0]]
+                temp_power_list = [int(row[2])]
             else:
-                temp_user.append(row[0], row[2])
+                temp_date.append(row[0])
+                temp_power_list.append(int(row[2]))
+        user.append(User(user_id[-1], temp_date, np.array(temp_power_list)))
     return user, user_id
 
 
@@ -207,25 +189,25 @@ def preprocessing(user):
     print (date_count)
 
     print('-lack date -add date and power')
-    for i in range(len(user)):
+    for i in range(len(user) - 1, -1, -1):
         date_len = len(user[i].date)
         if date_len != 609:
             print(str(date_len) + ' - user_id: ' + user[i].id)
-            for index, date in enumerate(user[0].date):
+            for index, date in enumerate(user[0].date[::-1]):
                 if date not in user[i].date:
                     print (date)
                     # add date and power
                     user[i].date.insert(index, date)
                     add_power = (user[i].power[index - 1] + user[i].power[index]) / 2
-                    user[i].power.insert(index, add_power)
+                    user[i].power = np.concatenate((user[i].power[:i], np.array([add_power]), user[i].power[i:]))
 
-    print('-delete stop users')
-    delete_list = []
-    for i in range(len(user)-1,0,-1):
-        if sum(user[i].power[-30:])<=60:
-            delete_list.append(i)
-            user.remove(user[i])
-    print('delete user: ' + str(delete_list))
+    print('-deal with stop users')
+    stop_list = []
+    for i in range(len(user) - 1, 0, -1):
+        if sum(user[i].power[-30:]) <= 60:
+            stop_list.append(i)
+            user[i].power = user[i].power[-31] * np.ones(len(user[i].power))
+    print('stop user: ' + str(stop_list))
 
     print('-add predict 2016.9 terms')
     for i in range(len(user)):
@@ -234,29 +216,27 @@ def preprocessing(user):
 
     print('-add filter for power')
     for i in range(len(user)):
-        user[i].power_filter = filter_smooth(np.array(user[i].power))
+        user[i].power_filter = filter_smooth(user[i].power)
 
     print('-add power_minus_filter')
     for i in range(len(user)):
-        user[i].power_minus_filter = np.array(user[i].power) - user[i].power_filter
+        user[i].power_minus_filter = user[i].power - user[i].power_filter
 
     return user
 
 
 def merge_user(user):
-    user_total = User('-1')
+    user_total = User('-1', [], np.array([]))
     user_total.date = user[0].date
     power_total = np.zeros(len(user[0].power))
     for i in range(len(user)):
         power_total = power_total + np.array(user[i].power)
-    user_total.power = power_total.tolist()
+    user_total.power = power_total
     power_filter_total = np.zeros(len(user[0].power_filter))
-    print len(user[0].power),len(user[0].power_filter)
     for i in range(len(user)):
         power_filter_total = power_filter_total + np.array(user[i].power_filter)
     user_total.power_filter = power_filter_total
     power_minus_filter_total = np.zeros(len(user[0].power_minus_filter))
-    print len(user[0].power), len(user[0].power_minus_filter)
     for i in range(len(user)):
         power_minus_filter_total = power_minus_filter_total + np.array(user[i].power_minus_filter)
     user_total.power_minus_filter = power_minus_filter_total
@@ -276,6 +256,7 @@ def show_figure(show_index, user, sum_flag=False):
             plt.figure(temp_show_index)
             plt.plot(range(len(user[temp_show_index].date)), user[temp_show_index].power, 'k')
             plt.plot(range(len(user[temp_show_index].date)), user[temp_show_index].power_filter, 'g')
+            plt.plot(range(len(user[temp_show_index].date)), user[temp_show_index].power_minus_filter, 'b')
             plt.plot(range(len(user[temp_show_index].date))[3:len(user[temp_show_index].date):7],
                      user[temp_show_index].power[3:len(user[temp_show_index].date):7], '*r')
 
@@ -286,6 +267,7 @@ def show_result(user_total):
     plt.plot([234, 272], [user_total.power[234], user_total.power[272]], 'yo')
     plt.plot(range(len(user_total.date) - 30), user_total.power[:-30], 'k')
     plt.plot(range(len(user_total.date)), user_total.power_filter, 'g')
+    plt.plot(range(len(user_total.date)), user_total.power_minus_filter, 'b')
     plt.plot(range(len(user_total.date) - 30, len(user_total.date)), user_total.power[-30:], 'b')
     plt.plot(range(len(user_total.date))[3:len(user_total.date):7], user_total.power[3:len(user[0].date):7], '*r')
     plt.show()
@@ -302,7 +284,7 @@ def write_csv(csv_name, predict_power):
 
 if __name__ == '__main__':
     # import date
-    user, user_id = import_date('Tianchi_power.csv')
+    user, user_id = import_date('Tianchi_power.csv',10000) #1454
     print('user number: ' + str(len(user)))
     print('date length: ' + str(len(user[0].date)))
 
