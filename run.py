@@ -98,8 +98,8 @@ class User(object):
     def train(self, arrays):
         self.set_holiday()
         delta_in_week_length_min = range(len(arrays))
+        model_error_min = 1000000000
         for i in range(len(arrays)):
-            model_error_min = 1000000000
             for diwl in range(50, 150, 10):
                 model_error_temp = self.model_error(arrays[i], [diwl])
                 if model_error_temp < model_error_min:
