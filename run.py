@@ -271,7 +271,7 @@ def show_result(user_total, predict_range, predict_power):
     plt.plot([234, 272], [user_total.power[234], user_total.power[272]], 'yo')
     plt.plot(range(len(user_total.date)), user_total.power, 'k')
     plt.plot(range(len(user_total.date)), user_total.power_filter, 'g')
-    plt.plot(range(len(user_total.date)), user_total.power_minus_filter, 'b')
+    plt.plot(range(len(user_total.date)-30), user_total.power_minus_filter[:-30], 'b')
     plt.plot(range(len(user_total.date) - 30, len(user_total.date)), user_total.power[-30:], 'b')
     plt.plot(range(len(user_total.date))[3:len(user_total.date):7], user_total.power[3:len(user[0].date):7], '*r')
     plt.show()
