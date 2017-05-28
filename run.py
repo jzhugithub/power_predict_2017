@@ -11,17 +11,18 @@ def max(nparray, num):
     return np.array([i if i > num else num for i in nparray])
 
 
+def play_filter(filter, nparray, length, step):
+    nparray2 = np.array(nparray)
+    for i in range(int(length/2), len(nparray) - int(length/2)-1):
+        nparray2[i] = filter(nparray[i - int(length/2):i + int(length/2):step])
+    return nparray2
+
+
 def filter_smooth(nparray):
-    filter1 = np.array(nparray)
-    # filter1[-30:] = np.ones(30)*np.median(nparray[len(nparray)-60:len(nparray)-32:2])
-    for i in range(7, len(nparray) - 8):
-        filter1[i] = np.median(nparray[i - 7:i + 7])
-    filter2 = np.array(filter1)
-    for i in range(7, len(filter1) - 8):
-        filter2[i] = np.mean(filter1[i - 7:i + 7])
-    filter2[-45:] = filter2[-45 - 365:-365] + filter2[-45] - filter2[-45 - 365]
-    filter2[-45:] = max(filter2[-45:], 0)
-    return filter2
+    nparray = play_filter(np.median, nparray, 14, 1)
+    nparray = play_filter(np.mean, nparray, 7, 1)
+    nparray[-45:] = max(nparray[-45:], 0)
+    return nparray
 
 
 class Holiday(object):
@@ -118,7 +119,7 @@ class User(object):
         # generate power_predict
         power_predict = np.zeros(array_end - array_begin)
         for index in range(array_begin, array_end):
-            power_predict[index - array_begin] = self.power_filter[index] + delta_in_week[(array_begin % 7 + index) % 7]
+            power_predict[index - array_begin] = self.power_filter[index] + delta_in_week[index % 7]
         # deal with holiday
         for index in self.holiday.index_with_name:
             if index > array_begin and index < array_end:
@@ -263,9 +264,11 @@ def show_figure(show_index, user, sum_flag=False):
             plt.show()
 
 
-def show_result(user_total):
+def show_result(user_total, predict_range, predict_power):
+    plt.plot(range(len(user_total.date)), [0 for i in range(len(user_total.date))], 'k')
+    plt.plot(range(predict_range[0],predict_range[1]),predict_power,'r')
     plt.plot([234, 272], [user_total.power[234], user_total.power[272]], 'yo')
-    plt.plot(range(len(user_total.date) - 30), user_total.power[:-30], 'k')
+    plt.plot(range(len(user_total.date)), user_total.power, 'k')
     plt.plot(range(len(user_total.date)), user_total.power_filter, 'g')
     plt.plot(range(len(user_total.date)), user_total.power_minus_filter, 'b')
     plt.plot(range(len(user_total.date) - 30, len(user_total.date)), user_total.power[-30:], 'b')
@@ -284,7 +287,7 @@ def write_csv(csv_name, predict_power):
 
 if __name__ == '__main__':
     # import date
-    user, user_id = import_date('Tianchi_power.csv',10000) #1454
+    user, user_id = import_date('Tianchi_power.csv',50) #1454
     print('user number: ' + str(len(user)))
     print('date length: ' + str(len(user[0].date)))
 
@@ -308,12 +311,13 @@ if __name__ == '__main__':
 
     # predict
     power_2016_9_total = user_total.predict(609, 639)
-    # power_2016_9_total = user_total.predict(579, 609)
     user_total.power[-30:] = power_2016_9_total
     print('power_2016_9_total: ' + str(power_2016_9_total))
 
+    predict_range = [534, 564]
+    predict_result = user_total.predict(predict_range[0], predict_range[1])
     # show predict result
-    show_result(user_total)
+    show_result(user_total, predict_range, predict_result)
     # plt.plot(range(len(user_total.date) - 30), user_total.power[:-30], 'k')
     # plt.plot(range(579, 609), power_2016_9_total, 'b')
     # plt.plot(range(len(user_total.date))[3:len(user_total.date):7], user_total.power[3:len(user[0].date):7], '*r')
