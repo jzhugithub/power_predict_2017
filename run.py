@@ -21,6 +21,7 @@ def play_filter(filter, nparray, length, step):
 def filter_smooth(nparray):
     nparray = play_filter(np.median, nparray, 14, 1)
     nparray = play_filter(np.mean, nparray, 7, 1)
+    nparray[-45:] = nparray[-45 - 365:-365] + nparray[-45] - nparray[-45 - 365]
     nparray[-45:] = max(nparray[-45:], 0)
     return nparray
 
