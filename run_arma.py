@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import arma as ar
 import pandas as pd
 
+
 def pdvalues_to_array(pdvalue):
     return np.array([i[0] for i in pdvalue])
 
@@ -26,7 +27,7 @@ def play_filter(filter, nparray, length, step):
 def filter_smooth(nparray):
     nparray = play_filter(np.median, nparray, 14, 1)
     nparray = play_filter(np.mean, nparray, 14, 1)
-    nparray[-45:] = nparray[-45 - 365:-365] + nparray[-45] - nparray[-45 - 365]
+    nparray[-45:] = nparray[-45 - 366:-366] + nparray[-45] - nparray[-45 - 366]
     nparray[-45:] = max(nparray[-45:], 0)
     return nparray
 
@@ -88,16 +89,25 @@ class User(object):
         self.power = np.concatenate((self.power, np.array([a_power])))
 
     def set_holiday(self):
-        self.holiday.add_index_with_name(269, 'zqj')  # zhongqiujie
-        self.holiday.add_index_with_name(623, 'zqj')
-        self.holiday.add_index_with_name(272, 'gq-1')  # guoqing -1
-        self.holiday.add_index_with_name(638, 'gq-1')
-        self.holiday.add_index_with_name(248, 'bj')  # Sunday, but have to work
-        self.holiday.add_index_with_name(626, 'bj')
-
-        self.compute_holiday_delta(269, 'zqj')
+        self.holiday.add_index_with_name(609, 'kzf')  # kangzhan,qu nian fang jian,jin nian bu fang jia
+        self.compute_holiday_delta(602, 'kzf')
+        self.holiday.add_index_with_name(612, 'kzb')  # kangzhan,qu nian bu jian,jin nian bu bu jia
+        self.compute_holiday_delta(605, 'kzb')
+        self.holiday.add_index_with_name(633, 'zqq')  # qu nian shi zhong qiu
+        self.compute_holiday_delta(605, 'zqq')
+        self.holiday.add_index_with_name(623, 'zq')  # zhongqiu
+        self.compute_holiday_delta(269, 'zq')
+        self.holiday.add_index_with_name(626, 'zqb')  # Sunday, but have to work
+        self.compute_holiday_delta(248, 'zqb')
+        self.holiday.add_index_with_name(638, 'gq-1')  # guoqing -1
         self.compute_holiday_delta(272, 'gq-1')
-        self.compute_holiday_delta(248, 'bj')
+        self.holiday.add_index_with_name(637, 'gq-2')  # guoqing -2
+        self.compute_holiday_delta(271, 'gq-2')
+        self.holiday.add_index_with_name(636, 'gq-1q')  # qu nian shi guoqing -1
+        self.compute_holiday_delta(608, 'gq-1q')
+        self.holiday.add_index_with_name(635, 'gq-2q')  # qu nian shi guoqing -2
+        self.compute_holiday_delta(607, 'gq-2q')
+
 
     def compute_holiday_delta(self, index, name):
         self.holiday.add_name_with_delta(name, self.power_minus_filter[int(index)])
@@ -108,7 +118,7 @@ class User(object):
         ar_model_best = None
         model_error_min = 1000000000
         for i in range(len(arrays)):
-            self.ar_model = ar.arima_model(self.delta_in_pd[arrays[i][0]-9:arrays[i][1]]-1,maxLag=7)
+            self.ar_model = ar.arima_model(self.delta_in_pd[arrays[i][0] - 9:arrays[i][1]] - 1, maxLag=8)
             self.ar_model.get_proper_model()
             print 'bic:', self.ar_model.bic, 'p:', self.ar_model.p, 'q:', self.ar_model.q
             print self.ar_model.properModel.forecast()[0]
@@ -123,7 +133,7 @@ class User(object):
         error = self.power[array[0]:array[1]] - power_predict
         return avg(abs(error))
 
-    def model(self, array_begin, array_end, parameter = None):
+    def model(self, array_begin, array_end, parameter=None):
 
         # predict
         ar_delta = self.ar_model.properModel.predict(self.date[array_begin], self.date[array_end - 1],
@@ -243,12 +253,13 @@ def merge_user(user):
 
 
 def show_figure(show_index, user, sum_flag=False):
+    index1 = show_index[0]
     if sum_flag:
-        user_power_total = np.zeros(len(user[0].power))
+        user_power_total = np.zeros(len(user[index1].power))
         for temp_show_index in show_index:
             user_power_total = user_power_total + np.array(user[temp_show_index].power)
-        plt.plot(range(len(user[0].date)), user_power_total, 'k')
-        plt.plot(range(len(user[0].date))[3:len(user[0].date):7], user_power_total[3:len(user[0].date):7], '*r')
+        plt.plot(range(len(user[index1].date)), user_power_total, 'k')
+        plt.plot(range(len(user[index1].date))[3:len(user[index1].date):7], user_power_total[3:len(user[index1].date):7], '*r')
         plt.show()
     else:
         for temp_show_index in show_index:
@@ -264,7 +275,7 @@ def show_figure(show_index, user, sum_flag=False):
 
 def show_result(user_total, predict_range, predict_power):
     plt.plot(range(len(user_total.date)), [0 for i in range(len(user_total.date))], 'k')
-    plt.plot(range(predict_range[0], predict_range[1]), predict_power, 'r')
+    # plt.plot(range(predict_range[0], predict_range[1]), predict_power, 'r')
     plt.plot([234, 272], [user_total.power[234], user_total.power[272]], 'yo')
     plt.plot(range(len(user_total.date)), user_total.power, 'k')
     plt.plot(range(len(user_total.date)), user_total.power_filter, 'g')
@@ -281,6 +292,7 @@ def write_csv(csv_name, predict_power):
         writer.writerow(['predict_date', 'predict_power_consumption'])
         for date in range(30):
             writer.writerow([20160901 + date, int(predict_power[date])])
+
 
 #
 # if __name__ == '__main__':
@@ -335,30 +347,24 @@ if __name__ == '__main__':
     p2016_9 = np.zeros(30)
     # preprocessing
 
-    for i in range(0,14):
+    for i in range(0, 14):
         print('i: ' + str(i))
-        user[i*100:i*100+100] = preprocessing(user[i*100:i*100+100])
-        user_total = merge_user(user[i*100:i*100+100])
+        user[i * 100:i * 100 + 100] = preprocessing(user[i * 100:i * 100 + 100])
+        user_total = merge_user(user[i * 100:i * 100 + 100])
 
-        # train
-        # train_arrays = [[509, 609]]
-        # if i == 3:
-        #     train_arrays = [[549, 609]]
-        # if i == 9 or i == 13:
-        #     train_arrays = [[519, 609]]
-        train_arrays = [[509, 609]]
-        if i == 6:
-            train_arrays = [[549, 609]]
-        if i == 10:
-            train_arrays = [[479, 609]]
+        # show_figure(range(i * 100,i * 100 + 100), user, sum_flag=True)
 
+        train_arrays = [[529, 609]]
+        if i == 12:
+            train_arrays = [[539, 609]]
+        # if i == 10:
+        #     train_arrays = [[479, 609]]
 
         user_total.train(train_arrays)
         error_train = user_total.evaluate(train_arrays)
         print('error_train: ' + str(error_train))
 
         p2016_9 = p2016_9 + user_total.predict(609, 639)
-
 
     user[1400:1453] = preprocessing(user[1400:1453])
     user_total = merge_user(user[1400:1453])
@@ -372,3 +378,5 @@ if __name__ == '__main__':
 
     # export
     write_csv('Tianchi_power_predict_table.csv', power_2016_9_total)
+
+    show_result(user_total, [], [])
