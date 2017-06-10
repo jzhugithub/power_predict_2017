@@ -1,6 +1,10 @@
 Tianchi_power.7z
 *.csv
-.idea/
 test.py
 date.md
-！ arma/monthly-car-sales-in-quebec-1960.csv
+！arma/monthly-car-sales-in-quebec-1960.csv
+.idea/
+arma/__init__.pyc
+arma/test_stationarity.pyc
+data/
+result/
