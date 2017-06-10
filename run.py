@@ -288,7 +288,7 @@ def write_csv(csv_name, predict_power):
 
 if __name__ == '__main__':
     # import date
-    user, user_id = import_date('Tianchi_power.csv',50) #1454
+    user, user_id = import_date('data/Tianchi_power.csv',10000) #1454
     print('user number: ' + str(len(user)))
     print('date length: ' + str(len(user[0].date)))
 
@@ -297,7 +297,7 @@ if __name__ == '__main__':
     user_total = merge_user(user)
     # user_total = user[0]
     # show average power
-    # show_figure(range(0,len(user)), user, sum_flag = False)
+    show_figure(range(1400,len(user)), user, sum_flag = False)
 
     # train
     train_arrays = [[549, 579], [579, 609]]
@@ -325,4 +325,4 @@ if __name__ == '__main__':
     # plt.show()
 
     # export
-    write_csv('Tianchi_power_predict_table.csv', power_2016_9_total)
+    write_csv('result/Tianchi_power_predict_table.csv', power_2016_9_total)
